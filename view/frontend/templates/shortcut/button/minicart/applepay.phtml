@@ -1,0 +1,31 @@
+<?php
+use Magento\Framework\Escaper;
+
+/**
+ * @var \Hyva\MolliePayment\Block\Shortcut\Button\Minicart\ApplePay $block
+ * @var Escaper $escaper
+ */
+
+?>
+<div>
+<div id="mollie_applepay_minicart" class="mollie-applepay-minicart mollie-applepay-button-hidden">
+    <apple-pay-button id="mollie_applepay_minicart_button" buttonstyle="<?= $block->getButtonColor() ?>" 
+        type="check-out" 
+        locale="<?= $block->getLocale() ?>"
+    ></apple-pay-button>
+</div>
+<script>
+(events => {
+  const initApplePayMiniCart = () => {
+    events.forEach(type => window.removeEventListener(type, initApplePayMiniCart));    
+    if (window.ApplePaySession && window.ApplePaySession.canMakePayments()) {        
+        document.getElementById('mollie_applepay_minicart').classList.remove('mollie-applepay-button-hidden');
+        document.getElementById('mollie_applepay_minicart_button').addEventListener('click', function(){
+            mollieApplePay.start();
+        })
+    }
+  };
+  events.forEach(type => window.addEventListener(type, initApplePayMiniCart, {once: true, passive: true}))
+})(['touchstart', 'mouseover', 'wheel', 'scroll', 'keydown'])
+</script>
+</div>

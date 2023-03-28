@@ -1,0 +1,224 @@
+<div>
+    <script>
+        var mollieApplePay = {
+            countryCode: '<?= $block->getCountryCode(); ?>',
+            currencyCode: '<?= $block->getCurrencyCode(); ?>',
+            supportedNetworks: <?= json_encode($block->getSupportedNetworks()) ?>,
+            merchantCapabilities: <?= json_encode($block->getMerchantCapabilities()) ?>,
+            storeName: '<?= $block->getStoreName(); ?>',
+            amount: 0,
+            shippingType: 'shipping',
+            requiredBillingContactFields: [
+                'postalAddress',
+                'name',
+                'email',
+                'phone'
+            ],
+            requiredShippingContactFields: [
+                'postalAddress',
+                'name',
+                'email',
+                'phone'
+            ],
+
+            session: null,
+            shippingContact: null,
+            shippingMethods: null,
+            selectedShippingMethod: null,
+            quoteTotals: null,
+
+            getLineItems: function () {
+                let totals = [...this.quoteTotals];
+                totals.pop();
+                return totals;
+            },
+            getTotal: function () {
+                let totals = [...this.quoteTotals];
+                var total = totals.pop();
+                total.label = this.storeName;
+                return total;
+            },
+            encodeData: function(object, prefix = ''){
+                var self = this;
+                return Object.entries(object)
+                    .map(([key, value]) => {
+                        if(typeof value === 'object' && value !== null || Array.isArray(value)){
+                            return self.encodeData(value, !prefix? key : prefix+'['+key+']');
+                        }
+                        if(prefix){
+                            return prefix+'['+encodeURIComponent(key)+']='+encodeURIComponent(value);
+                        }
+                        return `${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
+                    }).join('&');
+            },
+            getUrl: function(url){
+                let p = new URLSearchParams({
+                    form_key: hyva.getFormKey(),
+                    t: Date.now()
+                });
+                return BASE_URL+url+'?'+p.toString();
+            },
+            logError: function(){
+                console.error.apply(this, arguments);
+                Magewire.find('hyva.mollie.applepay').log.apply(this, arguments);
+            },
+            start: function(){
+                var self = this;
+                let request = {
+                    countryCode: self.countryCode,
+                    currencyCode: self.currencyCode,
+                    supportedNetworks: self.supportedNetworks,
+                    merchantCapabilities: self.merchantCapabilities,
+                    total: {
+                        label: self.storeName,
+                        amount: self.amount,
+                    },
+                    shippingType: self.shippingType,
+                    requiredBillingContactFields: self.requiredBillingContactFields,
+                    requiredShippingContactFields: self.requiredShippingContactFields,
+                }
+
+                if(!self.session){
+                    self.session = new ApplePaySession(3, request);
+                }
+
+                self.session.onpaymentmethodselected = function(){
+                    self.session.completePaymentMethodSelection(self.getTotal(), []);
+                }
+
+                self.session.onshippingcontactselected = function(event){
+                    self.shippingContact = event.shippingContact;
+                    fetch(self.getUrl('mollie/applePay/shippingMethods'), {
+                        method: 'POST',
+                        body: self.encodeData({
+                            countryCode: event.shippingContact.countryCode,
+                            postalCode: event.shippingContact.postalCode
+                        }),
+                        headers: {'Content-Type': 'application/x-www-form-urlencoded'}
+                    }).then(response => {
+                        if(!response.ok){
+                            response.text().then(result => {
+                                self.logError('mollie/applePay/shippingMethods', {result});
+                            });
+                            return;
+                        }
+
+                        response.json().then(result => {
+                            self.shippingMethods = result.shipping_methods;
+                            self.selectedShippingMethod = result.shipping_methods[0];
+                            self.quoteTotals = result.totals;
+                            self.session.completeShippingContactSelection(
+                                ApplePaySession.STATUS_SUCCESS,
+                                result.shipping_methods,
+                                self.getTotal(),
+                                self.getLineItems()
+                            );
+                        })
+                    }).catch(error => {
+                        self.logError('mollie/applePay/shippingMethods', {error});
+                    })
+                }
+
+                self.session.onshippingmethodselected = function (event) {
+                    self.selectedShippingMethod = event.shippingMethod;
+                    fetch(self.getUrl('mollie/applePay/shippingMethods'), {
+                        method: 'POST',
+                        body: self.encodeData({
+                            countryCode: self.shippingContact.countryCode,
+                            postalCode: self.shippingContact.postalCode,
+                            shippingMethod: event.shippingMethod,
+                        }),
+                        headers: {'Content-Type': 'application/x-www-form-urlencoded'}
+                    }).then(response => {
+                        if(!response.ok){
+                            response.text().then(result => {
+                                self.logError('mollie/applePay/shippingMethods', {result});
+                            });
+                            return;
+                        }
+                        response.json().then(result => {
+                            self.quoteTotals = result.totals;
+
+                            self.session.completeShippingMethodSelection(
+                                ApplePaySession.STATUS_SUCCESS,
+                                self.getTotal(),
+                                self.getLineItems()
+                            );
+                        })
+                    }).catch(error => {
+                        self.logError('mollie/applePay/shippingMethods', {error});
+                    })
+                }
+
+                self.session.onpaymentauthorized = function (event) {
+                    fetch(self.getUrl('mollie/applePay/placeOrder'), {
+                        method: 'POST',
+                        body: self.encodeData({
+                            shippingMethod: self.selectedShippingMethod,
+                            billingAddress: event.payment.billingContact,
+                            shippingAddress: event.payment.shippingContact,
+                            applePayPaymentToken: JSON.stringify(event.payment.token)
+                        }),
+                        headers: {'Content-Type': 'application/x-www-form-urlencoded'}
+                    }).then(response => {
+                        if(!response.ok){
+                            response.text().then(result => {
+                                self.logError('mollie/applePay/placeOrder', {result});
+                            });
+                            return;
+                        }
+
+                        if (!self.session) {
+                            self.logError('mollie/applePay/placeOrder', {message: 'payment canceled'});
+                            return;
+                        }
+
+                        response.json().then(result => {
+                            self.session.completePayment(ApplePaySession.STATUS_SUCCESS);
+                            setTimeout( function () {
+                                location.href = result.url
+                            }, 500);
+                        })
+
+                    }).catch(error => {
+                        self.logError('mollie/applePay/placeOrder', {error});
+                    })
+                };
+
+                self.session.onvalidatemerchant = function (event) {
+                    fetch(self.getUrl('mollie/checkout/applePayValidation'), {
+                        method: 'POST',
+                        body: self.encodeData({
+                            validationURL: 'https://apple-pay-gateway.apple.com/paymentservices/startSession'
+                        }),
+                        headers: {'Content-Type': 'application/x-www-form-urlencoded'}
+                    }).then(response => {
+                        if(!response.ok){
+                            response.text().then(result => {
+                                self.logError('mollie/applePay/applePayValidation', {result});
+                            });
+                            return;
+                        }
+                        response.json().then(result => {
+                            self.session.completeMerchantValidation(result);            
+                        });
+                
+                    }).catch(error => {
+                        self.logError('mollie/applePay/applePayValidation', {error});
+                    })
+                };
+
+                self.session.oncancel = function () {
+                    self.session = null;
+                    self.shippingContact = null;
+                };
+
+                self.session.begin();
+            }
+        };
+
+        window.addEventListener("private-content-loaded", function(event){
+            mollieApplePay.amount = (Math.round(parseFloat(event.detail.data.cart.subtotalAmount) * 100) / 100).toFixed(2);
+        });
+    </script>
+</div>

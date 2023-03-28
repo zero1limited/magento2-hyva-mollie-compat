@@ -1,0 +1,232 @@
+<?php
+declare(strict_types=1);
+/** @var Hyva\MolliePayment\Block\Checkout\Payment\Method\CreditCard $block */
+?>
+<div class="xl:flex xl:space-x-4 xl:space-y-0 space-y-4">
+    <div id="mollie-credit-card-container">
+
+        <div class="mollie-credit-card-wrap mollie-credit-card-name">
+            <label for="mollie-credit-card-holder">Name on card</label>
+            <div id="mollie-credit-card-holder" class="mollie-credit-card-field"></div>
+            <div id="mollie-credit-card-holder-error" class="mollie-credit-card-error"></div>
+        </div>
+
+        <div class="mollie-credit-card-wrap mollie-credit-card-name">
+            <label for="mollie-credit-card-number">Card number</label>
+            <div id="mollie-credit-card-number" class="mollie-credit-card-field"></div>
+            <div id="mollie-credit-card-number-error" class="mollie-credit-card-error"></div>
+        </div>
+
+        <div class="mollie-credit-card-wrap mollie-credit-card-exp">
+            <label for="mollie-credit-card-expiry-date">Expiry Date</label>
+            <div id="mollie-credit-card-expiry-date" class="mollie-credit-card-field"></div>
+            <div id="mollie-credit-card-expiry-date-error" class="mollie-credit-card-error"></div>
+        </div>
+
+        <div class="mollie-credit-card-wrap mollie-credit-card-cvv">
+            <label for="mollie-credit-card-cvv">CVV</label>
+            <div id="mollie-credit-card-cvv" class="mollie-credit-card-field"></div>
+            <div id="mollie-credit-card-cvv-error" class="mollie-credit-card-error"></div>
+        </div>
+    </div>
+
+    <script>
+        const MOLLIE_METHOD_CREDIT_CARD = 'mollie_methods_creditcard';
+        const PLACE_ORDER_BUTTON_SELECTOR = '.btn-primary[x-bind="buttonPlaceOrder()"]';
+        var mollieConfig = {
+            components: {
+                cardHolder: {
+                    type: 'cardHolder',
+                    elementId: '#mollie-credit-card-holder',
+                    options: {},
+                    model: null
+                },
+                cardNumber: {
+                    type: 'cardNumber',
+                    elementId: '#mollie-credit-card-number',
+                    options: {},
+                    model: null
+                },
+                expiryDate: {
+                    type: 'expiryDate',
+                    elementId: '#mollie-credit-card-expiry-date',
+                    options: {},
+                    model: null
+                },
+                verificationCode: {
+                    type: 'verificationCode',
+                    elementId: '#mollie-credit-card-cvv',
+                    options: {},
+                    model: null
+                },
+            }
+        }
+
+        /**
+         * Initialize Mollie and create the JS components
+         */
+        async function initMollie() {
+            try {
+                window.mollie = Mollie(
+                    '<?= $block->getMollieConfigProvider()->getProfileId(); ?>', 
+                    {
+                        testMode: <?= json_encode($block->getMollieConfigProvider()->isTestMode()); ?>,
+                        locale: '<?= $block->getLocale(); ?>',
+                    }
+                );
+                for (const componentId in mollieConfig.components){
+                    let componentConfig = mollieConfig.components[componentId];
+                    mollieConfig.components[componentId].model = window.mollie.createComponent(
+                        componentConfig.type,
+                        componentConfig.options
+                    );
+                }
+            } catch (error) {
+                hyvaCheckout.payment.dispatchExceptionMessage(
+                    '<?= $escaper->escapeHtml(__('There was an error talking to card provider: ')) ?>' + error.result,
+                    'error'
+                );
+                console.error(error);
+                return this;
+            }
+        }
+
+        /**
+         * Disable/enable place order button based on all CC fields being valid
+         */
+        function updatePlaceOrderButton() {
+            let isValid = true;
+            for (const componentId in mollieConfig.components){
+                let model = mollieConfig.components[componentId].model;
+                if(!model){
+                    isValid = false;
+                    break;
+                }
+                if(mollieConfig.components[componentId].valid !== true){
+                    isValid = false;
+                }
+            }
+            document.querySelector(PLACE_ORDER_BUTTON_SELECTOR).disabled = !isValid;
+        }
+
+        /**
+         * Mount all mollie elements
+         */
+        async function mollieMountElements() {
+            for (const componentId in mollieConfig.components){
+                let componentConfig = mollieConfig.components[componentId];
+                let model = componentConfig.model;
+                let domID = componentConfig.elementId;
+                model.mount(domID);
+
+                var errorElement = document.querySelector(domID + '-error');
+                mollieConfig.components[componentId].valid = null;
+                errorElement.textContent = '';
+                errorElement.style.display = 'none';
+
+                mollieConfig.components[componentId].listener = function (event) {
+                    if (event.touched) {
+                        mollieConfig.components[componentId].valid = true;
+
+                        if (event.error) {
+                            errorElement.textContent = event.error;
+                            errorElement.style.display = 'block';
+                            mollieConfig.components[componentId].valid = false;
+                        } else {
+                            errorElement.textContent = '';
+                            errorElement.style.display = 'none';
+                        }
+                    }
+                    updatePlaceOrderButton();
+                }
+
+                model.addEventListener('change', mollieConfig.components[componentId].listener);
+            }
+        }
+
+        async function mollieUnMountElements() {
+            for (const componentId in mollieConfig.components){
+                let componentConfig = mollieConfig.components[componentId];
+                let model = componentConfig.model;
+                let domID = componentConfig.elementId;
+                model.removeEventListener('change', mollieConfig.components[componentId].listener);
+                model.unmount();
+            }
+
+            document.querySelector(PLACE_ORDER_BUTTON_SELECTOR).disabled = false;
+        }
+
+        if (!window.mollieCreditCardListenerAttached) {
+            window.addEventListener('checkout:payment:method-activate', (event) => {
+                if(event.detail && event.detail.method == MOLLIE_METHOD_CREDIT_CARD){
+                    hyvaCheckout.payment.activate('mollie_methods_creditcard', {
+                        async placeOrder(data) {
+                            window.mollie.createToken().then( function (result) {
+                                if (result.error) {
+                                    hyvaCheckout.payment.dispatchExceptionMessage(
+                                        '<?= $escaper->escapeHtml(__('There was an error talking to card provider: ')) ?>' + result.message,
+                                        'error'
+                                    );
+                                    console.error(result);
+                                    throw result.error;
+                                }
+                            
+                                if (result.token) {
+                                    // set this against the payment
+                                    Magewire.find('checkout.payment.method.mollie_methods_creditcard').call('setToken', result.token);
+                                    hyvaCheckout.main.getWireComponent().placeOrder()
+                                }
+                            });
+                        },
+                        placeOrderViaJs() {
+                            return true;
+                        },
+                        async initialize() {
+                            // Load the SDK library file when it is needed
+                            if (!window.mollie) {
+                                // Add the SDK script tag to the page & initialize onload
+                                const script = document.createElement('script');
+                                script.src = 'https://js.mollie.com/v1/mollie.js';
+                                document.head.append(script);
+                                script.addEventListener('load', () => initMollie()
+                                    .then(() => mollieMountElements())
+                                );
+                            } else {
+                                mollieMountElements();
+                            }
+                        }
+                    }, document.getElementById('mollie-credit-card-container'))
+                }else{
+                    hyvaCheckout.payment.method = null;
+                    mollieUnMountElements();
+                }
+            });
+            window.mollieCreditCardListenerAttached = true;
+        }
+    </script>
+
+
+    <?php if (! empty($payableTo)): ?>
+        <div class="xl:w-1/2 w-full p-4 bg-gray-100 rounded-lg">
+            <header class="font-bold w-full mb-2">
+                <?= $escaper->escapeHtml(__('Make Check payable to:')) ?>
+            </header>
+
+            <p>
+                <?= $escaper->escapeHtml($payableTo) ?>
+            </p>
+        </div>
+    <?php endif ?>
+
+    <?php if (! empty($checkTo)): ?>
+        <div class="xl:w-1/2 w-full p-4 bg-gray-100 rounded-lg">
+            <header class="font-bold w-full mb-2">
+                <?= $escaper->escapeHtml(__('Send Check to:')) ?>
+            </header>
+
+            <address>
+                <?= /* @noEscape */ nl2br($escaper->escapeHtml($checkTo)) ?>
+            </address>
+        </div>
+    <?php endif ?>
+</div>

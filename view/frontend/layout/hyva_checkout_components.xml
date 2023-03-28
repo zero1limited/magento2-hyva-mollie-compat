@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <referenceBlock name="checkout.payment.methods">
+            <block name="checkout.payment.method.mollie_methods_creditcard"
+                as="mollie_methods_creditcard"
+                template="Hyva_MolliePayment::checkout/payment/method/creditcard.phtml"
+                class="Hyva\MolliePayment\Block\Checkout\Payment\Method\CreditCard"
+                ifconfig="payment/mollie_methods_creditcard/use_components">
+                <arguments>
+                    <argument name="magewire" xsi:type="object">
+                        \Hyva\MolliePayment\Magewire\CreditCard
+                    </argument>
+                </arguments>
+            </block>
+            <block name="checkout.payment.method.mollie_methods_applepay"
+                as="mollie_methods_applepay"
+                template="Hyva_MolliePayment::checkout/payment/method/applepay.phtml" />
+            <block name="checkout.payment.method.mollie_methods_paypal"
+                as="mollie_methods_paypal"
+                template="Hyva_MolliePayment::checkout/payment/method/paypal.phtml" />
+        </referenceBlock>
+
+        <referenceContainer name="checkout.payment.methods.after">
+            <block name="checkout.payment.methods.after.mollie_applepay"
+                as="mollie_applepay"
+                template="Hyva_MolliePayment::checkout/payment/methods/after/applepay.phtml"/>
+        </referenceContainer>
+    </body>
+</page>

@@ -1,0 +1,19 @@
+<?php
+declare(strict_types=1);
+$applePayMethodSelector = 'payment-method-option-mollie_methods_applepay';
+?>
+<style>
+    #<?= $applePayMethodSelector ?>.inactive {
+        display: none;
+    }
+</style>
+
+<script>
+    window.addEventListener('checkout:step:loaded', () => { 
+        if (window.ApplePaySession && window.ApplePaySession.canMakePayments()) {
+            // Add ApplePay to the method selection in your checkout
+            let p = document.querySelector('#<?= $applePayMethodSelector ?>.inactive');
+            p.style.display = 'block';    
+        }
+    }, { once: true })
+</script>

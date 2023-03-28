@@ -1,0 +1,45 @@
+{
+    "name": "hyva/mollie-payment",
+    "description": "Hyva compatibility module for Mollie Payment Module for Magento 2",
+    "version": "2.23.0",
+    "keywords": [
+      "mollie",
+      "hyva",
+      "magento2",
+      "magento 2"
+    ],
+    "require": {
+      "mollie/magento2": "^2.23",
+      "magento/framework": ">=102.0.3",
+      "magento/module-backend": ">=100.3.3",
+      "magento/module-catalog": ">=100.3.3",
+      "magento/module-checkout": ">=100.3.3",
+      "magento/module-config": ">=100.3.3",
+      "magento/module-customer": ">=100.3.3",
+      "magento/module-eav": ">=100.3.3",
+      "magento/module-payment": ">=100.3.3",
+      "magento/module-quote": ">=100.3.3",
+      "magento/module-sales": ">=100.3.3",
+      "magento/module-sales-rule": ">=100.3.3",
+      "magento/module-store": ">=100.3.3",
+      "magento/module-tax": ">=100.3.3",
+      "magento/module-ui": ">=100.3.3",
+      "magento/module-vault": ">=100.3.3",
+      "php": ">=7.3",
+      "ext-json": "*"
+    },
+    "type": "magento2-module",
+    "license": [
+      "OSL-3.0",
+      "AFL-3.0"
+    ],
+    "autoload": {
+      "files": [
+        "registration.php"
+      ],
+      "psr-4": {
+        "Hyva\\MolliePayment\\": ""
+      }
+    }
+  }
+  

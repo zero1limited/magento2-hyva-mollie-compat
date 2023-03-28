@@ -1,0 +1,16 @@
+<script>
+(events => {
+  const loadHyvaMollieLibraries = () => {
+    events.forEach(type => window.removeEventListener(type, loadHyvaMollieLibraries))
+    
+    var applePaySdkLibrary = document.createElement('script');
+    applePaySdkLibrary.src = 'https://applepay.cdn-apple.com/jsapi/v1/apple-pay-sdk.js';
+    document.head.append(applePaySdkLibrary);
+    applePaySdkLibrary.addEventListener('load', () => {
+        // console.log('applepay sdk is loaded');
+    });
+
+  };
+  events.forEach(type => window.addEventListener(type, loadHyvaMollieLibraries, {once: true, passive: true}))
+})(['touchstart', 'mouseover', 'wheel', 'scroll', 'keydown'])
+</script>
