@@ -3,9 +3,9 @@
     <type name="Hyva\Checkout\Model\Magewire\Payment\PlaceOrderServiceProvider">
         <arguments>
             <argument name="placeOrderServiceList" xsi:type="array">
-                <item name="mollie_methods_creditcard" xsi:type="object">Hyva\MolliePayment\Model\Magewire\Payment\PlaceOrderService</item>
-                <item name="mollie_methods_applepay" xsi:type="object">Hyva\MolliePayment\Model\Magewire\Payment\PlaceOrderService</item>
-                <item name="mollie_methods_paypal" xsi:type="object">Hyva\MolliePayment\Model\Magewire\Payment\PlaceOrderService</item>
+                <item name="mollie_methods_creditcard" xsi:type="object">Zero1\MollieHyvaCompatibility\Model\Magewire\Payment\PlaceOrderService</item>
+                <item name="mollie_methods_applepay" xsi:type="object">Zero1\MollieHyvaCompatibility\Model\Magewire\Payment\PlaceOrderService</item>
+                <item name="mollie_methods_paypal" xsi:type="object">Zero1\MollieHyvaCompatibility\Model\Magewire\Payment\PlaceOrderService</item>
             </argument>
         </arguments>
     </type>
